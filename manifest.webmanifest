@@ -1,0 +1,17 @@
+{
+  "name": "Kalkulator Modal Recovery",
+  "short_name": "Modal Recovery",
+  "description": "Hitung modal untuk target profit, cek statistik strategi, dan simulasi Monte Carlo.",
+  "lang": "id",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#14202b",
+  "theme_color": "#14202b",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Modal Recovery</title>
+<meta name="description" content="Hitung modal untuk target profit, cek statistik strategi, dan simulasi Monte Carlo.">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e161e" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Modal Recovery">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preload" href="fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/barlow-condensed-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Barlow"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/barlow-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/barlow-condensed-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); }
+:root {
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --field: #f8fafc;
+  --ink: #14202b;
+  --muted: #566676;
+  --rule: #d3dae2;
+  --gold: #8f6610;
+  --gold-strong: #b8860b;
+  --band-o: rgba(184, 134, 11, 0.14);
+  --band-i: rgba(184, 134, 11, 0.32);
+  --good: #1d7650;
+  --bad: #b1352c;
+  --warn: #a95710;
+  --sans: "Barlow", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --cond: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", "Barlow", sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e161e;
+    --surface: #15202a;
+    --field: #1a2733;
+    --ink: #e3e9ef;
+    --muted: #94a4b4;
+    --rule: #283746;
+    --gold: #e2b24c;
+    --gold-strong: #e9bb55;
+    --band-o: rgba(233, 187, 85, 0.13);
+    --band-i: rgba(233, 187, 85, 0.30);
+    --good: #5cc497;
+    --bad: #ef8178;
+    --warn: #f0a35e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e161e;
+  --surface: #15202a;
+  --field: #1a2733;
+  --ink: #e3e9ef;
+  --muted: #94a4b4;
+  --rule: #283746;
+  --gold: #e2b24c;
+  --gold-strong: #e9bb55;
+  --band-o: rgba(233, 187, 85, 0.13);
+  --band-i: rgba(233, 187, 85, 0.30);
+  --good: #5cc497;
+  --bad: #ef8178;
+  --warn: #f0a35e;
+  color-scheme: dark;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+main { max-width: 1000px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+
+/* Hero: the question as a sentence, with the answer under it */
+.hero { padding: 0.5rem 0 2rem; border-bottom: 2px solid var(--ink); }
+.hero h1 { font: 600 1rem/1.3 var(--sans); color: var(--gold); margin: 0 0 1rem; }
+.sentence {
+  font-family: var(--cond);
+  font-weight: 500;
+  font-size: clamp(1.65rem, 4.4vw, 2.75rem);
+  line-height: 1.4;
+  margin: 0;
+  max-width: 24em;
+}
+input.inline {
+  font: inherit;
+  color: var(--gold);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--gold);
+  border-radius: 0;
+  padding: 0 0.08em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+}
+input.inline:hover { background: var(--band-o); }
+.answer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem 2.5rem;
+  margin-top: 1.75rem;
+}
+.answer .lab { font-size: 0.95rem; color: var(--muted); max-width: 30ch; }
+.answer .fig {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: clamp(2.1rem, 5.4vw, 3.25rem);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  margin: 0.2rem 0 0.25rem;
+  overflow-wrap: anywhere;
+}
+.answer .sub { font-size: 0.92rem; color: var(--muted); }
+.basis { margin: 1.75rem 0 0; color: var(--muted); max-width: 70ch; }
+.basis input.inline { font-weight: 600; }
+
+/* Sections */
+.sec {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 1rem 2.5rem;
+  padding: 2.25rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 760px) { .sec { grid-template-columns: minmax(0, 1fr); } }
+.sec h2 { font-family: var(--cond); font-weight: 600; font-size: 1.6rem; line-height: 1.2; margin: 0 0 0.5rem; }
+.sec .desc { color: var(--muted); font-size: 0.93rem; margin: 0; }
+.sec-body { min-width: 0; }
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.88rem; color: var(--muted); }
+.inwrap { position: relative; display: flex; align-items: center; }
+.inwrap input, .field select {
+  width: 100%;
+  font: 500 1.05rem/1.25 var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.55rem 2.4rem 0.55rem 0.65rem;
+}
+.field select { padding-right: 0.65rem; }
+.inwrap .unit { position: absolute; right: 0.65rem; color: var(--muted); pointer-events: none; font-size: 0.92rem; }
+.inwrap.pre input { padding-left: 2.25rem; padding-right: 0.65rem; }
+.inwrap .unit-pre { position: absolute; left: 0.65rem; color: var(--muted); pointer-events: none; font-size: 0.92rem; }
+.field.check { flex-direction: row; align-items: center; gap: 0.55rem; color: var(--ink); align-self: end; min-height: 2.65rem; font-size: 0.92rem; }
+.field.check input { width: 1.1rem; height: 1.1rem; accent-color: var(--gold-strong); margin: 0; flex: none; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--gold-strong); outline-offset: 2px; }
+input.inline:focus-visible { outline-offset: 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 1.75rem; }
+.stat { border-top: 1px solid var(--rule); padding: 0.8rem 0 1rem; }
+.stat .k { font-size: 0.87rem; color: var(--muted); }
+.stat .v { font-family: var(--cond); font-weight: 600; font-size: 1.75rem; line-height: 1.15; font-variant-numeric: tabular-nums; margin: 0.15rem 0; }
+.stat .s { font-size: 0.84rem; color: var(--muted); }
+.stat.warn .v { color: var(--warn); }
+.stat.bad .v { color: var(--bad); }
+
+.note { font-size: 0.88rem; color: var(--muted); margin: 1rem 0 0; max-width: 72ch; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; min-width: 480px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { font-weight: 500; font-size: 0.86rem; color: var(--muted); text-align: right; padding: 0.5rem 0.6rem; border-bottom: 2px solid var(--ink); }
+td { text-align: right; padding: 0.6rem; border-bottom: 1px solid var(--rule); }
+th:first-child, td:first-child { text-align: left; }
+tr.hl td { background: var(--band-o); font-weight: 600; }
+
+.btnrow { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1.5rem; }
+button {
+  font: 500 0.92rem/1.2 var(--sans);
+  padding: 0.6rem 0.9rem;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.chart-wrap { overflow-x: auto; margin-top: 1rem; }
+#chart { display: block; width: 100%; min-width: 560px; height: auto; }
+#chart text { font-family: var(--sans); font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+#chart .grid { stroke: var(--rule); stroke-width: 1; }
+#chart .axis, #chart .tick { stroke: var(--muted); stroke-width: 1; }
+#chart .band-o { fill: var(--band-o); }
+#chart .band-i { fill: var(--band-i); }
+#chart .median { fill: none; stroke: var(--gold); stroke-width: 2.25; stroke-linejoin: round; }
+#chart .ref-start { stroke: var(--muted); stroke-dasharray: 4 4; stroke-width: 1.25; }
+#chart .ref-target { stroke: var(--good); stroke-dasharray: 7 4; stroke-width: 1.5; }
+#chart text.lab-target { fill: var(--good); font-weight: 600; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; }
+.legend i { display: inline-block; width: 20px; height: 10px; margin-right: 0.4rem; vertical-align: middle; }
+.legend .sw-median { height: 3px; background: var(--gold); }
+.legend .sw-in { background: var(--band-i); }
+.legend .sw-out { background: var(--band-o); }
+.legend .sw-target { height: 0; border-top: 2px dashed var(--good); }
+.legend .sw-start { height: 0; border-top: 2px dashed var(--muted); }
+
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem 1.5rem; padding-top: 1.5rem; font-size: 0.88rem; color: var(--muted); }
+.foot button { font-size: 0.86rem; padding: 0.45rem 0.75rem; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <h1>Kalkulator modal recovery</h1>
+  <p class="sentence">
+    Saya ingin profit Rp&nbsp;<input id="target" class="inline money" data-min="6" type="text" inputmode="numeric" autocomplete="off" aria-label="Target profit dalam rupiah" value="100.000.000">
+    dalam <input id="months" class="inline" data-min="1.6" type="text" inputmode="decimal" autocomplete="off" aria-label="Periode dalam bulan" value="6"> bulan,
+    dengan target <input id="daily" class="inline" data-min="2" type="text" inputmode="decimal" autocomplete="off" aria-label="Target return per hari dalam persen" value="1">% per hari.
+  </p>
+  <div class="answer">
+    <div>
+      <div class="lab">Modal yang dibutuhkan jika profit diputar (compounding)</div>
+      <div class="fig" id="figComp">—</div>
+      <div class="sub" id="subComp"></div>
+    </div>
+    <div>
+      <div class="lab">Modal yang dibutuhkan jika profit ditarik tiap hari</div>
+      <div class="fig" id="figWd">—</div>
+      <div class="sub" id="subWd"></div>
+    </div>
+  </div>
+  <p class="basis">
+    Dihitung dari <input id="dpw" class="inline" data-min="1.6" type="text" inputmode="decimal" autocomplete="off" aria-label="Hari trading per minggu" value="5"> hari trading per minggu,
+    dengan <input id="setup" class="inline" data-min="3" type="text" inputmode="decimal" autocomplete="off" aria-label="Persentase hari yang ada setup valid" value="100">% hari yang ada setup valid.
+    <span id="daysMeta"></span> Hari tanpa setup dihitung 0%.
+  </p>
+</header>
+
+<section class="sec">
+  <div>
+    <h2>Perbandingan target harian</h2>
+    <p class="desc">Target profit dan periode sama, dengan beberapa pilihan return harian. Baris yang disorot adalah target Anda.</p>
+  </div>
+  <div class="sec-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Return per hari</th><th>Profit ditarik</th><th>Compounding</th><th>Modal tumbuh</th></tr></thead>
+        <tbody id="rateTable"></tbody>
+      </table>
+    </div>
+    <p class="note"><em>Profit ditarik</em>: modal tetap, profit harian diambil. <em>Compounding</em>: profit diputar sehingga modal ikut membesar. Keduanya menganggap target harian selalu tercapai, tanpa hari rugi.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div>
+    <h2>Cek dengan statistik strategi</h2>
+    <p class="desc">Return harian di atas hanyalah asumsi. Bagian ini menghitung apa yang dihasilkan win rate, target R, dan risk per trade. Nilai awal dari backtest 100 trade: risk 2%, target 2R, expectancy ≈0,74R (win rate ≈58%).</p>
+  </div>
+  <div class="sec-body">
+    <div class="fields">
+      <label class="field"><span>Risk per trade</span><span class="inwrap"><input id="risk" type="text" inputmode="decimal" autocomplete="off" value="2"><span class="unit">%</span></span></label>
+      <label class="field"><span>Win rate</span><span class="inwrap"><input id="wr" type="text" inputmode="decimal" autocomplete="off" value="58"><span class="unit">%</span></span></label>
+      <label class="field"><span>Target profit</span><span class="inwrap"><input id="rr" type="text" inputmode="decimal" autocomplete="off" value="2"><span class="unit">R</span></span></label>
+      <label class="field"><span>Biaya &amp; slippage per trade</span><span class="inwrap"><input id="cost" type="text" inputmode="decimal" autocomplete="off" value="0"><span class="unit">R</span></span></label>
+      <label class="field"><span>Margin error win rate (±)</span><span class="inwrap"><input id="moe" type="text" inputmode="decimal" autocomplete="off" value="9,7"><span class="unit">%</span></span></label>
+    </div>
+    <div class="stats" id="stratStats"></div>
+    <p class="note" id="stratNote"></p>
+  </div>
+</section>
+
+<section class="sec">
+  <div>
+    <h2>Simulasi Monte Carlo</h2>
+    <p class="desc">Ribuan jalur acak memakai statistik strategi di atas. Satu trade per hari bila ada setup, risk dihitung dari ekuitas berjalan, hasil +R atau −1R dikurangi biaya.</p>
+  </div>
+  <div class="sec-body">
+    <div class="fields">
+      <label class="field"><span>Modal awal</span><span class="inwrap pre"><span class="unit-pre">Rp</span><input id="capital" class="money" type="text" inputmode="numeric" autocomplete="off" value="38.000.000"></span></label>
+      <label class="field"><span>Jumlah simulasi</span>
+        <select id="sims">
+          <option value="1000">1.000 jalur</option>
+          <option value="2000" selected>2.000 jalur</option>
+          <option value="4000">4.000 jalur</option>
+        </select>
+      </label>
+      <label class="field check"><input id="uncert" type="checkbox" checked><span>Acak win rate dalam rentang margin error</span></label>
+    </div>
+    <div class="btnrow">
+      <button type="button" id="fillTop">Pakai modal hitungan atas</button>
+      <button type="button" id="fillStrat">Pakai modal dari statistik</button>
+      <button type="button" id="rerun" class="primary">Jalankan ulang</button>
+    </div>
+    <div class="stats" id="mcStats"></div>
+    <div class="chart-wrap">
+      <svg id="chart" viewBox="0 0 800 340" role="img" aria-label="Sebaran ekuitas dari simulasi Monte Carlo"></svg>
+    </div>
+    <div class="legend">
+      <span><i class="sw-median"></i>Median</span>
+      <span><i class="sw-in"></i>50% jalur di tengah</span>
+      <span><i class="sw-out"></i>80% jalur di tengah</span>
+      <span><i class="sw-target"></i>Modal + target</span>
+      <span><i class="sw-start"></i>Modal awal</span>
+    </div>
+    <p class="note">Hasil simulasi hanya sebaik win rate yang dimasukkan. Backtest 100 trade cenderung lebih optimis dari kondisi live, jadi coba juga win rate yang lebih rendah atau biaya 0,1–0,2R sebagai uji tekanan.</p>
+  </div>
+</section>
+
+<footer class="foot">
+  <span>Gambaran matematis, bukan rekomendasi keuangan. <span id="offline"></span></span>
+  <button type="button" id="reset">Kembalikan ke nilai awal</button>
+</footer>
+
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = 'orb-recovery-calc-v1';
+  const FIELDS = ['target', 'months', 'daily', 'dpw', 'setup', 'risk', 'wr', 'rr', 'cost', 'moe', 'capital', 'sims', 'uncert'];
+  const DEFAULTS = {};
+
+  // ---------- formatting ----------
+  const nf = (v, d) => v.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const rp = v => isFinite(v) ? (v < 0 ? '−' : '') + 'Rp ' + Math.round(Math.abs(v)).toLocaleString('id-ID') : 'Tidak tercapai';
+  function rpc(v) {
+    if (!isFinite(v)) return 'tidak tercapai';
+    const a = Math.abs(v), s = v < 0 ? '−' : '';
+    if (a >= 1e12) return s + 'Rp ' + nf(a / 1e12, 2) + ' T';
+    if (a >= 1e9) return s + 'Rp ' + nf(a / 1e9, 2) + ' M';
+    if (a >= 1e6) return s + 'Rp ' + nf(a / 1e6, 1) + ' jt';
+    if (a >= 1e3) return s + 'Rp ' + nf(a / 1e3, 0) + ' rb';
+    return s + 'Rp ' + Math.round(a);
+  }
+  const signed = v => (v > 0 ? '+' : '') + rpc(v);
+  function axisRp(v) {
+    const f = (x, u) => 'Rp ' + nf(x, Math.abs(x - Math.round(x)) < 1e-6 ? 0 : 1) + ' ' + u;
+    if (v >= 1e12) return f(v / 1e12, 'T');
+    if (v >= 1e9) return f(v / 1e9, 'M');
+    if (v >= 1e6) return f(v / 1e6, 'jt');
+    if (v >= 1e3) return f(v / 1e3, 'rb');
+    return 'Rp ' + Math.round(v);
+  }
+  const pct = (v, d = 1) => isFinite(v) ? nf(v * 100, d) + '%' : '—';
+  const pctAuto = v => pct(v, Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6 ? 1 : 2);
+  const pctProb = v => pct(v, v > 0 && v < 0.1 ? 1 : 0);
+  const tile = (k, v, s = '', cls = '') =>
+    `<div class="stat ${cls}"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
+
+  // ---------- inputs ----------
+  const num = id => { const v = parseFloat(String($(id).value).replace(',', '.')); return isFinite(v) ? v : 0; };
+  const money = id => { const d = $(id).value.replace(/\D/g, ''); return d ? Number(d) : 0; };
+  function autosize(el) {
+    if (!el.classList.contains('inline')) return;
+    const min = parseFloat(el.dataset.min) || 2;
+    el.style.width = Math.max(min, el.value.length + 0.6) + 'ch';
+  }
+  function setMoney(id, v) { const el = $(id); el.value = Math.round(v).toLocaleString('id-ID'); autosize(el); }
+  function reformatMoney(el) {
+    const pos = el.selectionStart ?? el.value.length;
+    const digitsBefore = el.value.slice(0, pos).replace(/\D/g, '').length;
+    const d = el.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    el.value = d ? Number(d).toLocaleString('id-ID') : '';
+    let i = 0, c = 0;
+    while (i < el.value.length && c < digitsBefore) { if (/\d/.test(el.value[i])) c++; i++; }
+    try { el.setSelectionRange(i, i); } catch (e) {}
+  }
+  function read() {
+    return {
+      target: money('target'),
+      months: clamp(num('months'), 0, 36),
+      daily: Math.max(0, num('daily')) / 100,
+      dpw: clamp(num('dpw'), 0, 7),
+      setup: clamp(num('setup'), 0, 100) / 100,
+      risk: clamp(num('risk'), 0, 50) / 100,
+      wr: clamp(num('wr'), 0, 100) / 100,
+      rr: Math.max(0, num('rr')),
+      cost: Math.max(0, num('cost')),
+      moe: clamp(num('moe'), 0, 50) / 100,
+      capital: money('capital'),
+      sims: parseInt($('sims').value, 10) || 2000,
+      uncert: $('uncert').checked
+    };
+  }
+
+  // ---------- math ----------
+  function dayCount(i) {
+    const total = Math.round(i.months * 52 / 12 * i.dpw);
+    return { total, eff: Math.round(total * i.setup) };
+  }
+  const capWd = (T, r, n) => T <= 0 ? 0 : (r > 0 && n > 0 ? T / (r * n) : Infinity);
+  const capCp = (T, r, n) => T <= 0 ? 0 : (r > 0 && n > 0 ? T / Math.expm1(n * Math.log1p(r)) : Infinity);
+  const growth = (p, r, W, L) => r * L >= 1 ? -Infinity : p * Math.log1p(r * W) + (1 - p) * Math.log1p(-r * L);
+  function strat(p, risk, R, cost) {
+    const W = R - cost, L = 1 + cost;
+    const E = p * W - (1 - p) * L;
+    return { W, L, E, arith: risk * E, g: growth(p, risk, W, L) };
+  }
+  function riskForGrowth(p, W, L, target) {
+    if (W <= 0) return { ok: false, rk: 0, gmax: -Infinity };
+    const rk = Math.min((p * W - (1 - p) * L) / (W * L), 0.999 / L);
+    if (!(rk > 0)) return { ok: false, rk: 0, gmax: -Infinity };
+    const gmax = growth(p, rk, W, L);
+    if (gmax < target) return { ok: false, rk, gmax };
+    let lo = 0, hi = rk;
+    for (let k = 0; k < 64; k++) { const m = (lo + hi) / 2; if (growth(p, m, W, L) < target) lo = m; else hi = m; }
+    return { ok: true, r: hi, rk, gmax };
+  }
+  function streak(n, p) {
+    const q = 1 - p;
+    if (q <= 0 || n < 1) return 0;
+    if (q >= 1) return n;
+    if (n * p <= 1) return Math.min(n, 1);
+    return Math.max(1, Math.round(Math.log(n * p) / Math.log(1 / q)));
+  }
+
+  // ---------- top + table ----------
+  function renderTop(i, dc) {
+    const n = dc.eff, T = i.target, r = i.daily;
+    const cp = capCp(T, r, n), wd = capWd(T, r, n);
+    const mult = Math.pow(1 + r, n);
+    $('figComp').textContent = rp(cp);
+    $('figWd').textContent = rp(wd);
+    const missing = 'Isi target profit, periode, dan return harian.';
+    $('subComp').textContent = isFinite(cp) && T > 0 ? `Modal tumbuh ${nf(mult, mult >= 100 ? 0 : 2)}× menjadi ${rpc(cp + T)} di akhir periode.` : missing;
+    $('subWd').textContent = isFinite(wd) && T > 0 ? `Profit sekitar ${rpc(wd * r)} per hari trading.` : missing;
+    $('daysMeta').textContent = `Total ${dc.total} hari trading, ${n} di antaranya ada setup.`;
+
+    const rates = [0.005, 0.01, 0.015, 0.02];
+    if (r > 0 && !rates.some(x => Math.abs(x - r) < 1e-9)) rates.push(r);
+    rates.sort((a, b) => a - b);
+    $('rateTable').innerHTML = rates.map(x => {
+      const m = Math.pow(1 + x, n);
+      const hl = Math.abs(x - r) < 1e-9;
+      return `<tr class="${hl ? 'hl' : ''}"><td>${pctAuto(x)}</td><td>${rp(capWd(T, x, n))}</td><td>${rp(capCp(T, x, n))}</td><td>${nf(m, m >= 100 ? 0 : 2)}×</td></tr>`;
+    }).join('');
+    return cp;
+  }
+
+  // ---------- strategy check ----------
+  function renderStrat(i, dc) {
+    const n = dc.eff, T = i.target;
+    const pLo = clamp(i.wr - i.moe, 0, 1), pHi = clamp(i.wr + i.moe, 0, 1);
+    const s = strat(i.wr, i.risk, i.rr, i.cost);
+    const lo = strat(pLo, i.risk, i.rr, i.cost);
+    const hi = strat(pHi, i.risk, i.rr, i.cost);
+    const capG = st => T <= 0 ? 0 : (n > 0 && st.g > 0 ? T / Math.expm1(n * st.g) : Infinity);
+    const capA = st => T <= 0 ? 0 : (n > 0 && st.arith > 0 ? T / (n * st.arith) : Infinity);
+    const gtr = st => isFinite(st.g) ? Math.expm1(st.g) : -1;
+
+    const tiles = [
+      tile('Expectancy per trade', `${nf(s.E, 2)} R`,
+        `Rentang ${nf(lo.E, 2)} sampai ${nf(hi.E, 2)} R untuk win rate ${pct(pLo, 1)}–${pct(pHi, 1)}.`,
+        s.E <= 0 ? 'bad' : ''),
+      tile('Pertumbuhan modal per trade', pct(gtr(s), 2),
+        `Rata-rata aritmetika ${pct(s.arith, 2)}. Di batas bawah margin error ${pct(gtr(lo), 2)}.`,
+        gtr(s) < i.daily ? 'warn' : ''),
+      tile('Modal dibutuhkan (compounding)', rp(capG(s)), `Rentang ${rpc(capG(hi))} sampai ${rpc(capG(lo))}.`, isFinite(capG(s)) ? '' : 'bad'),
+      tile('Modal dibutuhkan (profit ditarik)', rp(capA(s)), `Rentang ${rpc(capA(hi))} sampai ${rpc(capA(lo))}.`, isFinite(capA(s)) ? '' : 'bad')
+    ];
+
+    const label = `Risk per trade untuk ${pctAuto(i.daily)} per hari`;
+    if (i.daily <= 0) {
+      tiles.push(tile(label, '—', 'Isi target return harian di bagian atas.'));
+    } else {
+      const need = riskForGrowth(i.wr, s.W, s.L, Math.log1p(i.daily));
+      const needA = s.E > 0 ? i.daily / s.E : Infinity;
+      if (need.ok) {
+        tiles.push(tile(label, pct(need.r, 2), `Untuk compounding. Jika profit ditarik ${pct(needA, 2)}.`, need.r > i.risk + 1e-9 ? 'warn' : ''));
+      } else {
+        tiles.push(tile(label, 'Tidak tercapai',
+          s.E > 0 ? `Pertumbuhan maksimum ${pct(Math.expm1(need.gmax), 2)} per trade, di risk ${pct(need.rk, 1)} (Kelly penuh).` : 'Expectancy nol atau negatif.',
+          'bad'));
+      }
+    }
+    const k = streak(n, i.wr);
+    const dd = 1 - Math.pow(Math.max(0, 1 - i.risk * s.L), k);
+    tiles.push(tile('Losing streak terpanjang (perkiraan)', `≈ ${k} kali`, `Setara drawdown ≈ ${pct(dd, 1)} di risk ${pct(i.risk, 1)}.`));
+    $('stratStats').innerHTML = tiles.join('');
+
+    let note;
+    if (s.E <= 0) {
+      note = 'Dengan expectancy nol atau negatif, strategi ini rata-rata mengurangi modal berapa pun ukurannya, jadi target tidak bisa dicapai.';
+    } else if (gtr(s) >= i.daily) {
+      note = `Di atas kertas statistik ini memberi ${pct(gtr(s), 2)} per trade, di atas target ${pctAuto(i.daily)}. Di batas bawah margin error angkanya ${pct(gtr(lo), 2)}, dan hasil live biasanya di bawah backtest.`;
+    } else {
+      note = `Statistik ini memberi ${pct(gtr(s), 2)} per trade, di bawah target ${pctAuto(i.daily)}. Mengejar target berarti menaikkan risk per trade ke angka di atas, dan drawdown ikut membesar.`;
+    }
+    $('stratNote').textContent = note;
+    return capG(s);
+  }
+
+  // ---------- Monte Carlo ----------
+  function gauss() {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+  function qt(a, f) {
+    const idx = (a.length - 1) * f, lo = Math.floor(idx), hi = Math.ceil(idx);
+    return a[lo] + (a[hi] - a[lo]) * (idx - lo);
+  }
+  function simulate(i, dc) {
+    const D = dc.total, N = i.sims, M = i.capital, T = i.target;
+    const W = i.rr - i.cost, L = 1 + i.cost, sd = i.moe / 1.96;
+    const step = Math.max(1, Math.ceil(D / 160));
+    const days = [];
+    for (let d = 0; d <= D; d += step) days.push(d);
+    if (days[days.length - 1] !== D) days.push(D);
+    const S = days.length;
+    const store = new Float64Array(N * S);
+    const finals = new Float64Array(N), mdds = new Float64Array(N);
+    let hitEnd = 0, hitAny = 0, lossEnd = 0, dd20 = 0, half = 0;
+
+    for (let s = 0; s < N; s++) {
+      let p = i.wr;
+      if (i.uncert && sd > 0) p = clamp(p + gauss() * sd, 0.01, 0.99);
+      let e = M, peak = M, mdd = 0, touched = false, k = 1;
+      store[s * S] = e;
+      for (let d = 1; d <= D; d++) {
+        if (e > 0 && Math.random() < i.setup) {
+          const stake = e * i.risk;
+          e += Math.random() < p ? stake * W : -stake * L;
+          if (e < 0) e = 0;
+          if (e > peak) peak = e;
+          else { const x = (peak - e) / peak; if (x > mdd) mdd = x; }
+          if (!touched && e - M >= T) touched = true;
+        }
+        if (k < S && d === days[k]) { store[s * S + k] = e; k++; }
+      }
+      finals[s] = e; mdds[s] = mdd;
+      if (e - M >= T) hitEnd++;
+      if (touched) hitAny++;
+      if (e < M) lossEnd++;
+      if (mdd >= 0.2) dd20++;
+      if (e < M * 0.5) half++;
+    }
+
+    const col = new Float64Array(N);
+    const bands = { p10: [], p25: [], p50: [], p75: [], p90: [] };
+    for (let k = 0; k < S; k++) {
+      for (let s = 0; s < N; s++) col[s] = store[s * S + k];
+      col.sort();
+      bands.p10.push(qt(col, 0.10)); bands.p25.push(qt(col, 0.25)); bands.p50.push(qt(col, 0.50));
+      bands.p75.push(qt(col, 0.75)); bands.p90.push(qt(col, 0.90));
+    }
+    finals.sort(); mdds.sort();
+    return {
+      D, N, M, T, days, bands,
+      pHitEnd: hitEnd / N, pHitAny: hitAny / N, pLoss: lossEnd / N, pDD20: dd20 / N, pHalf: half / N,
+      medFinal: qt(finals, 0.5), p10Final: qt(finals, 0.1), p90Final: qt(finals, 0.9), medMdd: qt(mdds, 0.5)
+    };
+  }
+  function niceTicks(a, b, n) {
+    const span = b - a;
+    if (!(span > 0)) return [a];
+    const raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), norm = raw / mag;
+    const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+    const out = [];
+    for (let v = Math.ceil(a / step) * step; v <= b + step * 1e-9; v += step) out.push(v);
+    return out;
+  }
+  function drawChart(r, i) {
+    const Wd = 800, Ht = 340, pl = 84, pr = 14, pt = 18, pb = 40;
+    const xs = r.days, xmax = r.D || 1;
+    const X = d => pl + d / xmax * (Wd - pl - pr);
+    let ymin = Math.min(r.M, ...r.bands.p10), ymax = Math.max(r.M + r.T, ...r.bands.p90);
+    const pad = (ymax - ymin) * 0.06 || r.M * 0.1 || 1;
+    ymin = Math.max(0, ymin - pad); ymax += pad;
+    const Y = v => pt + (1 - (v - ymin) / (ymax - ymin)) * (Ht - pt - pb);
+    const f = v => v.toFixed(1);
+    let h = '';
+    for (const t of niceTicks(ymin, ymax, 5)) {
+      if (t < ymin || t > ymax) continue;
+      const y = f(Y(t));
+      h += `<line class="grid" x1="${pl}" x2="${Wd - pr}" y1="${y}" y2="${y}"/>`;
+      h += `<text x="${pl - 8}" y="${y}" dy="0.32em" text-anchor="end">${axisRp(t)}</text>`;
+    }
+    const months = Math.max(1, Math.round(i.months));
+    const every = months > 18 ? 4 : months > 12 ? 3 : months > 6 ? 2 : 1;
+    for (let m = 0; m <= months; m += every) {
+      const d = Math.min(r.D, Math.round(m * 52 / 12 * i.dpw));
+      const x = f(X(d));
+      h += `<line class="tick" x1="${x}" x2="${x}" y1="${Ht - pb}" y2="${Ht - pb + 5}"/>`;
+      h += `<text x="${x}" y="${Ht - pb + 21}" text-anchor="${m === 0 ? 'start' : 'middle'}">${m === 0 ? 'Mulai' : 'Bulan ' + m}</text>`;
+    }
+    const area = (top, bot) => {
+      let d = '';
+      for (let k = 0; k < xs.length; k++) d += (k ? 'L' : 'M') + f(X(xs[k])) + ',' + f(Y(top[k]));
+      for (let k = xs.length - 1; k >= 0; k--) d += 'L' + f(X(xs[k])) + ',' + f(Y(bot[k]));
+      return d + 'Z';
+    };
+    const line = arr => { let d = ''; for (let k = 0; k < xs.length; k++) d += (k ? 'L' : 'M') + f(X(xs[k])) + ',' + f(Y(arr[k])); return d; };
+    h += `<path class="band-o" d="${area(r.bands.p90, r.bands.p10)}"/>`;
+    h += `<path class="band-i" d="${area(r.bands.p75, r.bands.p25)}"/>`;
+    const yM = f(Y(r.M)), yT = f(Y(r.M + r.T));
+    h += `<line class="ref-start" x1="${pl}" x2="${Wd - pr}" y1="${yM}" y2="${yM}"/>`;
+    h += `<line class="ref-target" x1="${pl}" x2="${Wd - pr}" y1="${yT}" y2="${yT}"/>`;
+    h += `<path class="median" d="${line(r.bands.p50)}"/>`;
+    h += `<text class="lab-target" x="${pl + 8}" y="${yT}" dy="-0.5em">Modal + target ${axisRp(r.M + r.T)}</text>`;
+    h += `<line class="axis" x1="${pl}" x2="${Wd - pr}" y1="${Ht - pb}" y2="${Ht - pb}"/>`;
+    $('chart').innerHTML = h;
+  }
+  function runMC() {
+    const i = read(), dc = dayCount(i);
+    if (!(i.capital > 0) || !(i.target > 0) || dc.total < 1) {
+      $('mcStats').innerHTML = tile('Simulasi belum bisa dijalankan', '—', 'Isi modal awal, target profit, dan periode.');
+      $('chart').innerHTML = '';
+      return;
+    }
+    const r = simulate(i, dc);
+    $('mcStats').innerHTML = [
+      tile('Peluang profit ≥ target di akhir periode', pctProb(r.pHitEnd), '', r.pHitEnd < 0.5 ? 'warn' : ''),
+      tile('Peluang sempat menyentuh target', pctProb(r.pHitAny), 'Relevan jika berhenti begitu target tercapai.'),
+      tile('Median profit akhir', signed(r.medFinal - r.M),
+        `10% jalur terburuk di bawah ${signed(r.p10Final - r.M)}, 10% terbaik di atas ${signed(r.p90Final - r.M)}.`,
+        r.medFinal < r.M ? 'bad' : ''),
+      tile('Peluang rugi di akhir periode', pctProb(r.pLoss), `Modal tersisa kurang dari separuh di ${pctProb(r.pHalf)} jalur.`, r.pLoss >= 0.2 ? 'bad' : ''),
+      tile('Median drawdown maksimum', pct(r.medMdd, 1), `Drawdown ≥ 20% terjadi di ${pctProb(r.pDD20)} jalur.`, r.medMdd >= 0.2 ? 'warn' : '')
+    ].join('');
+    drawChart(r, i);
+  }
+
+  // ---------- orchestration ----------
+  let topCap = Infinity, stratCap = Infinity, timer = null;
+  const roundUp = v => Math.ceil(v / 100000) * 100000;
+  function recalc() {
+    const i = read(), dc = dayCount(i);
+    topCap = renderTop(i, dc);
+    stratCap = renderStrat(i, dc);
+    const okTop = isFinite(topCap) && topCap > 0, okStrat = isFinite(stratCap) && stratCap > 0;
+    $('fillTop').textContent = okTop ? `Pakai modal hitungan atas (${rpc(roundUp(topCap))})` : 'Pakai modal hitungan atas';
+    $('fillStrat').textContent = okStrat ? `Pakai modal dari statistik (${rpc(roundUp(stratCap))})` : 'Pakai modal dari statistik';
+    $('fillTop').disabled = !okTop;
+    $('fillStrat').disabled = !okStrat;
+    save();
+    clearTimeout(timer);
+    timer = setTimeout(runMC, 220);
+  }
+  function save() {
+    try {
+      const o = {};
+      for (const f of FIELDS) { const el = $(f); o[f] = el.type === 'checkbox' ? el.checked : el.value; }
+      localStorage.setItem(KEY, JSON.stringify(o));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      for (const f of FIELDS) {
+        if (!(f in o)) continue;
+        const el = $(f);
+        if (el.type === 'checkbox') el.checked = !!o[f]; else el.value = o[f];
+      }
+    } catch (e) {}
+  }
+
+  FIELDS.forEach(f => { const el = $(f); DEFAULTS[f] = el.type === 'checkbox' ? el.checked : el.value; });
+  load();
+  document.querySelectorAll('input.inline').forEach(autosize);
+
+  document.querySelectorAll('input, select').forEach(el => {
+    if (el.type === 'checkbox' || el.tagName === 'SELECT') { el.addEventListener('change', recalc); return; }
+    el.addEventListener('input', () => {
+      if (el.classList.contains('money')) reformatMoney(el);
+      autosize(el);
+      recalc();
+    });
+  });
+  $('fillTop').addEventListener('click', () => { if (isFinite(topCap)) { setMoney('capital', roundUp(topCap)); recalc(); } });
+  $('fillStrat').addEventListener('click', () => { if (isFinite(stratCap)) { setMoney('capital', roundUp(stratCap)); recalc(); } });
+  $('rerun').addEventListener('click', runMC);
+  $('reset').addEventListener('click', () => {
+    FIELDS.forEach(f => { const el = $(f); if (el.type === 'checkbox') el.checked = DEFAULTS[f]; else el.value = DEFAULTS[f]; });
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    document.querySelectorAll('input.inline').forEach(autosize);
+    recalc();
+  });
+
+  recalc();
+
+  // ---------- offline app (service worker) ----------
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').then(() => {
+        $('offline').textContent = 'Bisa dipakai offline.';
+      }).catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
